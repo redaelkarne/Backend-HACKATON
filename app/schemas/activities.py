@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -43,3 +43,14 @@ class ActivityOut(BaseModel):
     completed_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
+
+
+class RouteOut(BaseModel):
+    activity_id: str
+    coordinates: List[List[float]]  # [[lat, lon], ...]
+    distance_km: Optional[float]
+    elevation_m: Optional[float]
+    duration_seconds: Optional[int]
+    average_speed_kmh: Optional[float]
+    started_at: datetime
+    completed_at: Optional[datetime]

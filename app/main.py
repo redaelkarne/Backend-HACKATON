@@ -1,7 +1,34 @@
 from fastapi import FastAPI
-from app.routers import health, auth, profiles, activities, community, progress, recommendations, challenges
+from fastapi.middleware.cors import CORSMiddleware
+from app.routers import (
+    health,
+    auth,
+    profiles,
+    activities,
+    community,
+    progress,
+    recommendations,
+    challenges,
+)
 
 app = FastAPI(title="Michelin Riding API", version="1.0.0")
+
+origins = [
+    "http://localhost:3000/",
+    "http://127.0.0.1:3000/",
+    "http://localhost:8081/",
+    "http://127.0.0.1:8081/",
+    "http://localhost:19006/",
+    "http://127.0.0.1:19006/",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=[""],
+    allow_headers=[""],
+)
 
 app.include_router(health.router)
 app.include_router(auth.router)
@@ -11,7 +38,6 @@ app.include_router(community.router)
 app.include_router(progress.router)
 app.include_router(recommendations.router)
 app.include_router(challenges.router)
-
 
 @app.get("/")
 async def root():

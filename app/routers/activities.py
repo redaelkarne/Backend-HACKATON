@@ -1,15 +1,17 @@
+import json
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+import gpxpy
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import get_current_user
 from app.database import get_db
-from app.models.models import Activity, User
+from app.models.models import Activity, Bike, User
 from app.schemas.activities import (
-    ActivityCompleteRequest, ActivityCreateRequest, ActivityOut, ActivityUpdateRequest,
+    ActivityCompleteRequest, ActivityCreateRequest, ActivityOut, ActivityUpdateRequest, RouteOut,
 )
 from app.schemas.common import ApiResponse, build_meta
 
@@ -108,6 +110,136 @@ async def complete_activity(
     activity.average_speed_kmh = body.average_speed_kmh
     activity.route_polyline = body.route_polyline
 
+    await db.commit()
+    await db.refresh(activity)
+    return ApiResponse(data=ActivityOut.model_validate(activity), meta=build_meta())
+
+
+@router.get("/{activityId}/route", response_model=ApiResponse[RouteOut])
+async def get_activity_route(
+    activityId: str,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    """
+    Return the GPS coordinates of an activity as a parsed array,
+    ready to pass directly to Leaflet or any OpenStreetMap renderer.
+
+    Example frontend usage:
+        const { coordinates } = data;
+        L.polyline(coordinates).addTo(map);
+    """
+    result = await db.execute(select(Activity).where(Activity.id == activityId))
+    activity = result.scalar_one_or_none()
+    if not activity:
+        raise HTTPException(status_code=404, detail="Activity not found")
+
+    if not activity.route_polyline:
+        raise HTTPException(status_code=404, detail="No route data for this activity")
+
+    try:
+        coordinates = json.loads(activity.route_polyline)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=500, detail="Route data is corrupted")
+
+    return ApiResponse(
+        data=RouteOut(
+            activity_id=activity.id,
+            coordinates=coordinates,
+            distance_km=activity.distance_km,
+            elevation_m=activity.elevation_m,
+            duration_seconds=activity.duration_seconds,
+            average_speed_kmh=activity.average_speed_kmh,
+            started_at=activity.started_at,
+            completed_at=activity.completed_at,
+        ),
+        meta=build_meta(),
+    )
+
+
+@router.post("/import/gpx", response_model=ApiResponse[ActivityOut], status_code=201)
+async def import_gpx(
+    file: UploadFile = File(..., description="GPX file exported from any GPS device or OpenStreetMap tool"),
+    bike_id: Optional[str] = Query(None, description="Bike to associate. Defaults to your first bike."),
+    type: str = Query("route", description="Activity type: route, gravel, mtb, urban"),
+    weather: Optional[str] = Query(None, description="Weather conditions: dry, wet, mixed"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Import a GPX file as a completed activity.
+    Distance, duration, elevation gain, average speed and route polyline
+    are all computed automatically from the track points.
+    """
+    if not file.filename or not file.filename.lower().endswith(".gpx"):
+        raise HTTPException(status_code=422, detail="File must be a .gpx file")
+
+    content = await file.read()
+    try:
+        gpx = gpxpy.parse(content.decode("utf-8"))
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid GPX file")
+
+    if not gpx.tracks:
+        raise HTTPException(status_code=422, detail="GPX file contains no tracks")
+
+    # Resolve bike
+    if bike_id:
+        bike_result = await db.execute(
+            select(Bike).where(Bike.id == bike_id, Bike.user_id == current_user.id)
+        )
+        if not bike_result.scalar_one_or_none():
+            raise HTTPException(status_code=404, detail="Bike not found")
+    else:
+        first_bike = await db.execute(
+            select(Bike).where(Bike.user_id == current_user.id).limit(1)
+        )
+        bike = first_bike.scalar_one_or_none()
+        if not bike:
+            raise HTTPException(
+                status_code=400,
+                detail="No bike on your profile. Add one first via POST /profiles/{userId}/bike.",
+            )
+        bike_id = bike.id
+
+    # Extract stats
+    moving_data = gpx.get_moving_data()
+    uphill_gain = gpx.get_uphill_downhill().uphill if gpx.has_elevations() else None
+
+    distance_km = round((moving_data.moving_distance or 0) / 1000, 2)
+    duration_seconds = int(moving_data.moving_time or 0)
+    elevation_m = round(uphill_gain, 1) if uphill_gain is not None else None
+    average_speed_kmh = round(distance_km / (duration_seconds / 3600), 2) if duration_seconds > 0 else 0
+
+    time_bounds = gpx.get_time_bounds()
+    started_at = time_bounds.start_time or datetime.now(timezone.utc)
+    ended_at = time_bounds.end_time or started_at
+
+    # Lightweight polyline: sample every 10th point as [[lat, lon], ...]
+    coords = []
+    for track in gpx.tracks:
+        for segment in track.segments:
+            for i, pt in enumerate(segment.points):
+                if i % 10 == 0:
+                    coords.append([round(pt.latitude, 6), round(pt.longitude, 6)])
+    route_polyline = json.dumps(coords) if coords else None
+
+    activity = Activity(
+        user_id=current_user.id,
+        bike_id=bike_id,
+        type=type,
+        status="completed",
+        weather=weather,
+        notes=file.filename,
+        started_at=started_at,
+        completed_at=ended_at,
+        distance_km=distance_km,
+        duration_seconds=duration_seconds,
+        elevation_m=elevation_m,
+        average_speed_kmh=average_speed_kmh,
+        route_polyline=route_polyline,
+    )
+    db.add(activity)
     await db.commit()
     await db.refresh(activity)
     return ApiResponse(data=ActivityOut.model_validate(activity), meta=build_meta())

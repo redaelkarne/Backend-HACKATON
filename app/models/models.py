@@ -19,6 +19,7 @@ class User(Base):
     level = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
+
     profile = relationship("Profile", back_populates="user", uselist=False)
     bikes = relationship("Bike", back_populates="user")
     activities = relationship("Activity", back_populates="user")
