@@ -1,0 +1,1434 @@
+openapi: 3.1.0
+info:
+  title: Michelin Riding API
+  version: 1.0.0
+  description: >-
+    BFF API for Michelin Riding web and mobile clients. This MVP covers
+    authentication, profiles, bikes, mounted tyres, activities, community,
+    progress, recommendations, and challenges.
+
+servers:
+  - url: https://api.michelin-riding.com
+    description: Production
+  - url: http://localhost:8000
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+  - name: Profile
+  - name: Activities
+  - name: Community
+  - name: Progress
+  - name: Recommendations
+  - name: Challenges
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              first_name: Souhail
+              last_name: Cherif
+              email: souhail@example.com
+              password: StrongPass123!
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+              example:
+                data:
+                  user:
+                    id: usr_001
+                    first_name: Souhail
+                    last_name: Cherif
+                    email: souhail@example.com
+                    level: 1
+                    created_at: '2026-06-16T10:00:00Z'
+                  access_token: jwt-access-token
+                  token_type: bearer
+                meta:
+                  request_id: req_001
+                  timestamp: '2026-06-16T10:00:00Z'
+        '409':
+          $ref: '#/components/responses/ConflictError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: souhail@example.com
+              password: StrongPass123!
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthSuccessResponse'
+              example:
+                data:
+                  user:
+                    id: usr_001
+                    first_name: Souhail
+                    last_name: Cherif
+                    email: souhail@example.com
+                    level: 4
+                    created_at: '2026-06-01T09:00:00Z'
+                  access_token: jwt-access-token
+                  token_type: bearer
+                meta:
+                  request_id: req_002
+                  timestamp: '2026-06-16T10:05:00Z'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current authenticated user
+      responses:
+        '200':
+          description: Current user returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+              example:
+                data:
+                  id: usr_001
+                  first_name: Souhail
+                  last_name: Cherif
+                  email: souhail@example.com
+                  level: 4
+                  created_at: '2026-06-01T09:00:00Z'
+                meta:
+                  request_id: req_003
+                  timestamp: '2026-06-16T10:06:00Z'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /profiles/{userId}:
+    get:
+      tags: [Profile]
+      summary: Get profile by user ID
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Profile returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+              example:
+                data:
+                  user_id: usr_001
+                  avatar_url: https://cdn.michelin-riding.com/avatars/usr_001.png
+                  rider_type: route
+                  bio: Passionné de longues sorties route.
+                  preferences:
+                    terrains: [route]
+                    priorities: [performance, long_distance]
+                    weather_preferences: [dry]
+                  stats:
+                    total_km: 1240
+                    total_rides: 28
+                    level: 4
+                meta:
+                  request_id: req_004
+                  timestamp: '2026-06-16T10:07:00Z'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    patch:
+      tags: [Profile]
+      summary: Update profile
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdateRequest'
+            example:
+              bio: Passionné de longues sorties route et de performance.
+              rider_type: route
+              preferences:
+                terrains: [route]
+                priorities: [performance, long_distance]
+                weather_preferences: [dry]
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /profiles/{userId}/bike:
+    post:
+      tags: [Profile]
+      summary: Add a bike to user profile
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BikeCreateRequest'
+            example:
+              brand: Trek
+              model: Emonda SL
+              category: route
+              wheel_size: 700c
+      responses:
+        '201':
+          description: Bike added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BikeResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /profiles/{userId}/mounted-tyres:
+    post:
+      tags: [Profile]
+      summary: Add mounted tyres to user equipment
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MountedTyreCreateRequest'
+            example:
+              bike_id: bik_001
+              brand: Michelin
+              model: Power Cup 2
+              size: 700x28
+              mounted_at: '2026-05-01'
+              estimated_lifespan_km: 4000
+      responses:
+        '201':
+          description: Mounted tyre added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MountedTyreResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /activities:
+    post:
+      tags: [Activities]
+      summary: Create a new activity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivityCreateRequest'
+            example:
+              user_id: usr_001
+              bike_id: bik_001
+              type: route
+              started_at: '2026-06-16T07:15:00Z'
+              weather: dry
+              notes: Sortie tempo matinale.
+      responses:
+        '201':
+          description: Activity created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityResponse'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    get:
+      tags: [Activities]
+      summary: List activities
+      parameters:
+        - in: query
+          name: user_id
+          schema:
+            type: string
+          description: Filter by user ID
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Activities returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityListResponse'
+              example:
+                data:
+                  items:
+                    - id: act_001
+                      user_id: usr_001
+                      bike_id: bik_001
+                      type: route
+                      status: completed
+                      distance_km: 42.3
+                      duration_seconds: 5640
+                      elevation_m: 312
+                      average_speed_kmh: 26.8
+                      started_at: '2026-06-16T07:15:00Z'
+                      completed_at: '2026-06-16T08:49:00Z'
+                meta:
+                  request_id: req_010
+                  timestamp: '2026-06-16T10:15:00Z'
+                  total: 1
+
+  /activities/{activityId}:
+    get:
+      tags: [Activities]
+      summary: Get activity by ID
+      parameters:
+        - $ref: '#/components/parameters/ActivityId'
+      responses:
+        '200':
+          description: Activity returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+    patch:
+      tags: [Activities]
+      summary: Update activity draft or metadata
+      parameters:
+        - $ref: '#/components/parameters/ActivityId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivityUpdateRequest'
+            example:
+              notes: Sortie tempo matinale + sprint final.
+              weather: dry
+      responses:
+        '200':
+          description: Activity updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /activities/{activityId}/complete:
+    post:
+      tags: [Activities]
+      summary: Complete activity and compute final stats
+      parameters:
+        - $ref: '#/components/parameters/ActivityId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActivityCompleteRequest'
+            example:
+              distance_km: 42.3
+              duration_seconds: 5640
+              elevation_m: 312
+              average_speed_kmh: 26.8
+              route_polyline: abc123polyline
+      responses:
+        '200':
+          description: Activity completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityResponse'
+
+  /feed:
+    get:
+      tags: [Community]
+      summary: Get community feed
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Feed returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedResponse'
+              example:
+                data:
+                  items:
+                    - id: post_001
+                      activity_id: act_001
+                      user:
+                        id: usr_001
+                        display_name: Souhail C.
+                        avatar_url: https://cdn.michelin-riding.com/avatars/usr_001.png
+                      summary:
+                        distance_km: 42.3
+                        elevation_m: 312
+                        duration_seconds: 5640
+                        tyre_name: Michelin Power Cup 2
+                      verified_michelin_review: true
+                      likes_count: 18
+                      comments_count: 4
+                      created_at: '2026-06-16T09:00:00Z'
+                meta:
+                  request_id: req_020
+                  timestamp: '2026-06-16T10:20:00Z'
+                  total: 1
+
+  /activities/{activityId}/like:
+    post:
+      tags: [Community]
+      summary: Like an activity post
+      parameters:
+        - $ref: '#/components/parameters/ActivityId'
+      responses:
+        '201':
+          description: Like created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LikeResponse'
+              example:
+                data:
+                  activity_id: act_001
+                  liked: true
+                  likes_count: 19
+                meta:
+                  request_id: req_021
+                  timestamp: '2026-06-16T10:21:00Z'
+
+  /activities/{activityId}/comments:
+    post:
+      tags: [Community]
+      summary: Comment on an activity post
+      parameters:
+        - $ref: '#/components/parameters/ActivityId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CommentCreateRequest'
+            example:
+              content: Super sortie, joli rythme !
+      responses:
+        '201':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CommentResponse'
+
+  /progress/summary:
+    get:
+      tags: [Progress]
+      summary: Get progress summary for current user
+      responses:
+        '200':
+          description: Progress summary returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProgressSummaryResponse'
+              example:
+                data:
+                  total_km: 1240
+                  total_rides: 28
+                  weekly_km: 187
+                  monthly_km: 524
+                  badges_count: 8
+                meta:
+                  request_id: req_030
+                  timestamp: '2026-06-16T10:25:00Z'
+
+  /progress/weekly:
+    get:
+      tags: [Progress]
+      summary: Get weekly progress details
+      responses:
+        '200':
+          description: Weekly progress returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeeklyProgressResponse'
+              example:
+                data:
+                  days:
+                    - day: mon
+                      distance_km: 22
+                    - day: tue
+                      distance_km: 35
+                    - day: wed
+                      distance_km: 0
+                    - day: thu
+                      distance_km: 48
+                    - day: fri
+                      distance_km: 30
+                    - day: sat
+                      distance_km: 52
+                    - day: sun
+                      distance_km: 0
+                meta:
+                  request_id: req_031
+                  timestamp: '2026-06-16T10:26:00Z'
+
+  /progress/tyre-wear:
+    get:
+      tags: [Progress]
+      summary: Get estimated tyre wear for mounted tyres
+      responses:
+        '200':
+          description: Tyre wear returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TyreWearListResponse'
+              example:
+                data:
+                  items:
+                    - mounted_tyre_id: mty_001
+                      tyre_name: Michelin Power Cup 2
+                      distance_done_km: 2340
+                      estimated_lifespan_km: 4000
+                      wear_percent: 58.5
+                      replacement_status: monitor
+                meta:
+                  request_id: req_032
+                  timestamp: '2026-06-16T10:27:00Z'
+
+  /recommendations/tyres:
+    post:
+      tags: [Recommendations]
+      summary: Generate tyre recommendation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TyreRecommendationRequest'
+            example:
+              rider_type: route
+              terrain: road
+              weather: dry
+              priority: performance
+              ride_frequency: frequent
+      responses:
+        '201':
+          description: Recommendation generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TyreRecommendationResponse'
+              example:
+                data:
+                  recommendation_id: rec_001
+                  primary_tyre:
+                    brand: Michelin
+                    model: Power Cup 2
+                    category: route
+                    reasons:
+                      - Optimisé pour la performance sur route sèche
+                      - Adapté aux longues distances
+                      - Bonne efficacité de roulement
+                  alternatives:
+                    - brand: Michelin
+                      model: Power All Season
+                      category: route
+                meta:
+                  request_id: req_040
+                  timestamp: '2026-06-16T10:30:00Z'
+
+  /recommendations/tyres/{recommendationId}:
+    get:
+      tags: [Recommendations]
+      summary: Get tyre recommendation by ID
+      parameters:
+        - $ref: '#/components/parameters/RecommendationId'
+      responses:
+        '200':
+          description: Recommendation returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TyreRecommendationResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /challenges:
+    get:
+      tags: [Challenges]
+      summary: List available challenges
+      responses:
+        '200':
+          description: Challenges returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChallengeListResponse'
+              example:
+                data:
+                  items:
+                    - id: chl_001
+                      title: 100 km cette semaine
+                      description: Atteignez 100 km avant dimanche soir.
+                      goal_type: distance_km
+                      goal_value: 100
+                      starts_at: '2026-06-16T00:00:00Z'
+                      ends_at: '2026-06-22T23:59:59Z'
+                      joined: false
+                meta:
+                  request_id: req_050
+                  timestamp: '2026-06-16T10:35:00Z'
+
+  /challenges/{challengeId}/join:
+    post:
+      tags: [Challenges]
+      summary: Join a challenge
+      parameters:
+        - $ref: '#/components/parameters/ChallengeId'
+      responses:
+        '201':
+          description: Challenge joined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChallengeJoinResponse'
+              example:
+                data:
+                  challenge_id: chl_001
+                  joined: true
+                  joined_at: '2026-06-16T10:36:00Z'
+                meta:
+                  request_id: req_051
+                  timestamp: '2026-06-16T10:36:00Z'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: usr_001
+
+    ActivityId:
+      name: activityId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: act_001
+
+    RecommendationId:
+      name: recommendationId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: rec_001
+
+    ChallengeId:
+      name: challengeId
+      in: path
+      required: true
+      schema:
+        type: string
+      example: chl_001
+
+  responses:
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Invalid request payload
+              details:
+                - field: email
+                  message: Must be a valid email address
+            meta:
+              request_id: req_err_001
+              timestamp: '2026-06-16T10:00:00Z'
+
+    UnauthorizedError:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHORIZED
+              message: Missing or invalid bearer token
+            meta:
+              request_id: req_err_002
+              timestamp: '2026-06-16T10:00:00Z'
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: NOT_FOUND
+              message: Resource not found
+            meta:
+              request_id: req_err_003
+              timestamp: '2026-06-16T10:00:00Z'
+
+    ConflictError:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: CONFLICT
+              message: User already exists
+            meta:
+              request_id: req_err_004
+              timestamp: '2026-06-16T10:00:00Z'
+
+  schemas:
+    Meta:
+      type: object
+      properties:
+        request_id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        total:
+          type: integer
+      required: [request_id, timestamp]
+
+    ErrorDetail:
+      type: object
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+      required: [message]
+
+    ErrorObject:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+      required: [code, message]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorObject'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [error, meta]
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        level:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+      required: [id, first_name, last_name, email, level, created_at]
+
+    RegisterRequest:
+      type: object
+      properties:
+        first_name:
+          type: string
+        last_name:
+          type: string
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+      required: [first_name, last_name, email, password]
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+      required: [email, password]
+
+    AuthPayload:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/User'
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: bearer
+      required: [user, access_token, token_type]
+
+    AuthSuccessResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/AuthPayload'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    UserResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/User'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    Preferences:
+      type: object
+      properties:
+        terrains:
+          type: array
+          items:
+            type: string
+        priorities:
+          type: array
+          items:
+            type: string
+        weather_preferences:
+          type: array
+          items:
+            type: string
+
+    ProfileStats:
+      type: object
+      properties:
+        total_km:
+          type: number
+        total_rides:
+          type: integer
+        level:
+          type: integer
+
+    Profile:
+      type: object
+      properties:
+        user_id:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
+        rider_type:
+          type: string
+          enum: [route, gravel, mtb, urban]
+        bio:
+          type: string
+        preferences:
+          $ref: '#/components/schemas/Preferences'
+        stats:
+          $ref: '#/components/schemas/ProfileStats'
+      required: [user_id, rider_type]
+
+    ProfileUpdateRequest:
+      type: object
+      properties:
+        avatar_url:
+          type: string
+          format: uri
+        rider_type:
+          type: string
+          enum: [route, gravel, mtb, urban]
+        bio:
+          type: string
+        preferences:
+          $ref: '#/components/schemas/Preferences'
+
+    ProfileResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Profile'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    BikeCreateRequest:
+      type: object
+      properties:
+        brand:
+          type: string
+        model:
+          type: string
+        category:
+          type: string
+          enum: [route, gravel, mtb, urban]
+        wheel_size:
+          type: string
+      required: [brand, model, category]
+
+    Bike:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        category:
+          type: string
+        wheel_size:
+          type: string
+      required: [id, user_id, brand, model, category]
+
+    BikeResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Bike'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    MountedTyreCreateRequest:
+      type: object
+      properties:
+        bike_id:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        size:
+          type: string
+        mounted_at:
+          type: string
+          format: date
+        estimated_lifespan_km:
+          type: number
+      required: [bike_id, brand, model, size, mounted_at, estimated_lifespan_km]
+
+    MountedTyre:
+      type: object
+      properties:
+        id:
+          type: string
+        bike_id:
+          type: string
+        brand:
+          type: string
+        model:
+          type: string
+        size:
+          type: string
+        mounted_at:
+          type: string
+          format: date
+        estimated_lifespan_km:
+          type: number
+      required: [id, bike_id, brand, model, size, mounted_at, estimated_lifespan_km]
+
+    MountedTyreResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/MountedTyre'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    ActivityCreateRequest:
+      type: object
+      properties:
+        user_id:
+          type: string
+        bike_id:
+          type: string
+        type:
+          type: string
+          enum: [route, gravel, mtb, urban]
+        started_at:
+          type: string
+          format: date-time
+        weather:
+          type: string
+          enum: [dry, wet, mixed]
+        notes:
+          type: string
+      required: [user_id, bike_id, type, started_at]
+
+    ActivityUpdateRequest:
+      type: object
+      properties:
+        weather:
+          type: string
+          enum: [dry, wet, mixed]
+        notes:
+          type: string
+
+    ActivityCompleteRequest:
+      type: object
+      properties:
+        distance_km:
+          type: number
+        duration_seconds:
+          type: integer
+        elevation_m:
+          type: number
+        average_speed_kmh:
+          type: number
+        route_polyline:
+          type: string
+      required: [distance_km, duration_seconds, elevation_m, average_speed_kmh]
+
+    Activity:
+      type: object
+      properties:
+        id:
+          type: string
+        user_id:
+          type: string
+        bike_id:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+          enum: [draft, in_progress, completed]
+        weather:
+          type: string
+        notes:
+          type: string
+        distance_km:
+          type: number
+        duration_seconds:
+          type: integer
+        elevation_m:
+          type: number
+        average_speed_kmh:
+          type: number
+        route_polyline:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+      required: [id, user_id, bike_id, type, status, started_at]
+
+    ActivityResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Activity'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    ActivityListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Activity'
+          required: [items]
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    FeedUser:
+      type: object
+      properties:
+        id:
+          type: string
+        display_name:
+          type: string
+        avatar_url:
+          type: string
+      required: [id, display_name]
+
+    FeedSummary:
+      type: object
+      properties:
+        distance_km:
+          type: number
+        elevation_m:
+          type: number
+        duration_seconds:
+          type: integer
+        tyre_name:
+          type: string
+
+    FeedItem:
+      type: object
+      properties:
+        id:
+          type: string
+        activity_id:
+          type: string
+        user:
+          $ref: '#/components/schemas/FeedUser'
+        summary:
+          $ref: '#/components/schemas/FeedSummary'
+        verified_michelin_review:
+          type: boolean
+        likes_count:
+          type: integer
+        comments_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+      required: [id, activity_id, user, created_at]
+
+    FeedResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/FeedItem'
+          required: [items]
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    LikeResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            activity_id:
+              type: string
+            liked:
+              type: boolean
+            likes_count:
+              type: integer
+          required: [activity_id, liked, likes_count]
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    CommentCreateRequest:
+      type: object
+      properties:
+        content:
+          type: string
+      required: [content]
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+        activity_id:
+          type: string
+        user_id:
+          type: string
+        content:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+      required: [id, activity_id, user_id, content, created_at]
+
+    CommentResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/Comment'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    ProgressSummary:
+      type: object
+      properties:
+        total_km:
+          type: number
+        total_rides:
+          type: integer
+        weekly_km:
+          type: number
+        monthly_km:
+          type: number
+        badges_count:
+          type: integer
+      required: [total_km, total_rides, weekly_km, monthly_km, badges_count]
+
+    ProgressSummaryResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/ProgressSummary'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    WeeklyProgressDay:
+      type: object
+      properties:
+        day:
+          type: string
+        distance_km:
+          type: number
+      required: [day, distance_km]
+
+    WeeklyProgressResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            days:
+              type: array
+              items:
+                $ref: '#/components/schemas/WeeklyProgressDay'
+          required: [days]
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    TyreWearItem:
+      type: object
+      properties:
+        mounted_tyre_id:
+          type: string
+        tyre_name:
+          type: string
+        distance_done_km:
+          type: number
+        estimated_lifespan_km:
+          type: number
+        wear_percent:
+          type: number
+        replacement_status:
+          type: string
+          enum: [ok, monitor, replace_soon]
+      required: [mounted_tyre_id, tyre_name, distance_done_km, estimated_lifespan_km, wear_percent, replacement_status]
+
+    TyreWearListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/TyreWearItem'
+          required: [items]
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    TyreCandidate:
+      type: object
+      properties:
+        brand:
+          type: string
+        model:
+          type: string
+        category:
+          type: string
+        reasons:
+          type: array
+          items:
+            type: string
+      required: [brand, model, category]
+
+    TyreRecommendationRequest:
+      type: object
+      properties:
+        rider_type:
+          type: string
+          enum: [route, gravel, mtb, urban]
+        terrain:
+          type: string
+          enum: [road, mixed, trail, city]
+        weather:
+          type: string
+          enum: [dry, wet, mixed]
+        priority:
+          type: string
+          enum: [performance, durability, puncture_protection, grip]
+        ride_frequency:
+          type: string
+          enum: [occasional, regular, frequent]
+      required: [rider_type, terrain, weather, priority, ride_frequency]
+
+    TyreRecommendationPayload:
+      type: object
+      properties:
+        recommendation_id:
+          type: string
+        primary_tyre:
+          $ref: '#/components/schemas/TyreCandidate'
+        alternatives:
+          type: array
+          items:
+            $ref: '#/components/schemas/TyreCandidate'
+      required: [recommendation_id, primary_tyre]
+
+    TyreRecommendationResponse:
+      type: object
+      properties:
+        data:
+          $ref: '#/components/schemas/TyreRecommendationPayload'
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    Challenge:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        goal_type:
+          type: string
+        goal_value:
+          type: number
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        joined:
+          type: boolean
+      required: [id, title, goal_type, goal_value, starts_at, ends_at, joined]
+
+    ChallengeListResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Challenge'
+          required: [items]
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
+
+    ChallengeJoinResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            challenge_id:
+              type: string
+            joined:
+              type: boolean
+            joined_at:
+              type: string
+              format: date-time
+          required: [challenge_id, joined, joined_at]
+        meta:
+          $ref: '#/components/schemas/Meta'
+      required: [data, meta]
