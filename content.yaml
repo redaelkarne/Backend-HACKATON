@@ -22,6 +22,13 @@ tags:
   - name: Auth
   - name: Profile
   - name: Activities
+  - name: Strava
+    description: >-
+      Connect a user's Strava account via OAuth and import Strava activities into
+      the local database. An imported activity is a full copy — it has its own
+      local ID, shows up in the feed, counts toward progress, and its GPS route
+      is available via GET /activities/{id}/route exactly like a GPX import.
+      The activity is no longer dependent on Strava after import.
   - name: Community
   - name: Progress
   - name: Recommendations
@@ -675,6 +682,244 @@ paths:
                   timestamp: '2026-06-16T10:35:00Z'
                   total: 1
 
+  # ─────────────────────────────────────────
+  # Strava
+  # ─────────────────────────────────────────
+  /strava/connect:
+    get:
+      tags: [Strava]
+      summary: Step 1 — Get the Strava OAuth URL
+      description: >-
+        Returns a URL the frontend must open in the user's browser or a WebView.
+        The user then authorises the app on Strava. After authorising, Strava
+        redirects automatically to GET /strava/callback — no further frontend
+        action is needed for the token exchange.
+
+        The `state` parameter embedded in the URL contains the user's ID so the
+        backend knows which account to link when the callback fires.
+      responses:
+        '200':
+          description: OAuth URL returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StravaConnectResponse'
+              example:
+                data:
+                  auth_url: >-
+                    https://www.strava.com/oauth/authorize?client_id=258562
+                    &redirect_uri=http://localhost:8000/strava/callback
+                    &response_type=code&scope=activity:read_all
+                    &state=usr_7d1bdcb5&approval_prompt=auto
+                  message: Open this URL in a browser to connect your Strava account.
+                meta:
+                  request_id: req_str_001
+                  timestamp: '2026-06-16T14:43:37Z'
+        '503':
+          description: Strava credentials not configured on the server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /strava/callback:
+    get:
+      tags: [Strava]
+      summary: Step 2 — OAuth callback (called automatically by Strava)
+      description: >-
+        **Do not call this endpoint manually.**
+
+        Strava redirects the user's browser here after they authorise the app.
+        The backend exchanges the one-time `code` for a long-lived access token
+        and refresh token, then stores both on the user record identified by
+        the `state` parameter (which contains the user ID set in step 1).
+
+        After this completes the user's Strava account is permanently linked.
+        The frontend can detect a successful link by checking for
+        `connected: true` in the response or by storing the result of this
+        redirect.
+      security: []
+      parameters:
+        - in: query
+          name: code
+          required: true
+          schema:
+            type: string
+          description: One-time authorisation code provided by Strava
+        - in: query
+          name: state
+          required: true
+          schema:
+            type: string
+          description: user_id passed through the OAuth state param
+        - in: query
+          name: scope
+          schema:
+            type: string
+          description: Scopes granted by the user (e.g. activity:read_all)
+      responses:
+        '200':
+          description: Strava account linked successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StravaConnectedResponse'
+              example:
+                data:
+                  connected: true
+                  athlete_id: '163090788'
+                  athlete_name: Souhail Cherif
+                meta:
+                  request_id: req_str_002
+                  timestamp: '2026-06-16T14:49:29Z'
+        '400':
+          description: Invalid or expired Strava authorisation code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /strava/activities:
+    get:
+      tags: [Strava]
+      summary: Step 3 — List the user's Strava activities
+      description: >-
+        Fetches the user's recent activities directly from the Strava API using
+        the stored access token. Returns a preview list including the `strava_id`
+        needed for the import step.
+
+        Use `already_imported: true` to grey out activities the user has already
+        brought into the app.
+
+        The access token is refreshed automatically if it has expired — the
+        frontend does not need to handle token refresh.
+      parameters:
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+          description: Number of activities to return
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: Page number for pagination
+      responses:
+        '200':
+          description: Strava activities returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StravaActivityListResponse'
+              example:
+                data:
+                  - strava_id: 18422693586
+                    name: Course à pied matinale
+                    sport_type: Run
+                    distance_km: 5.1
+                    duration_seconds: 1821
+                    elevation_m: 3.8
+                    started_at: '2026-05-08T08:31:09Z'
+                    already_imported: false
+                meta:
+                  request_id: req_str_003
+                  timestamp: '2026-06-16T14:50:00Z'
+                  total: 1
+        '400':
+          description: Strava account not connected — call GET /strava/connect first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Strava API unreachable or returned an error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /strava/import:
+    post:
+      tags: [Strava]
+      summary: Step 4 — Import a Strava activity into the local database
+      description: >-
+        Fetches the full activity and GPS route from Strava, then saves a
+        permanent copy in the local database as a completed Activity.
+
+        **What gets copied from Strava:**
+        - Activity name (stored as `notes`)
+        - Distance, moving time, elevation gain, average speed
+        - GPS coordinates from the Strava streams API (sampled every 10th point,
+          same strategy as GPX imports)
+
+        **After import the activity is fully local:**
+        - It gets its own `id` (e.g. `act_ab6e6f62`)
+        - It appears in the community feed
+        - It counts toward progress stats and tyre wear
+        - Its GPS route is available via `GET /activities/{id}/route` — identical
+          to what a GPX import produces, so map rendering is the same
+        - It persists even if the user disconnects Strava later
+
+        The Strava activity is not modified or deleted on Strava's side.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StravaImportRequest'
+            example:
+              strava_activity_id: 18422693586
+              type: route
+              weather: dry
+              bike_id: bik_001
+      responses:
+        '201':
+          description: Activity imported and saved locally
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityResponse'
+              example:
+                data:
+                  id: act_ab6e6f62
+                  user_id: usr_7d1bdcb5
+                  bike_id: bik_ab6dd4a7
+                  type: route
+                  status: completed
+                  notes: Course à pied matinale
+                  distance_km: 5.1
+                  duration_seconds: 1821
+                  elevation_m: 3.8
+                  average_speed_kmh: 10.1
+                  started_at: '2026-05-08T08:31:09'
+                  completed_at: '2026-05-08T09:04:50'
+                meta:
+                  request_id: req_str_004
+                  timestamp: '2026-06-16T14:51:28Z'
+        '400':
+          description: Strava not connected, or no bike on the profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Strava activity not found (wrong ID or private)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Strava API unreachable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /challenges/{challengeId}/join:
     post:
       tags: [Challenges]
@@ -789,6 +1034,95 @@ components:
         detail:
           type: string
       required: [detail]
+
+    # ── Strava ────────────────────────────
+    StravaConnectResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            auth_url:
+              type: string
+              format: uri
+              description: Open this URL in the user's browser or WebView
+            message:
+              type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    StravaConnectedResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            connected:
+              type: boolean
+            athlete_id:
+              type: string
+            athlete_name:
+              type: string
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    StravaActivityPreview:
+      type: object
+      properties:
+        strava_id:
+          type: integer
+          description: Use this ID to import the activity via POST /strava/import
+        name:
+          type: string
+        sport_type:
+          type: string
+          description: Activity type as reported by Strava (e.g. Ride, Run, VirtualRide)
+        distance_km:
+          type: number
+        duration_seconds:
+          type: integer
+        elevation_m:
+          type: number
+        started_at:
+          type: string
+          format: date-time
+        already_imported:
+          type: boolean
+          description: >-
+            True if this Strava activity has already been imported into the local
+            database. Use this to grey out or hide already-imported activities in
+            the UI.
+      required: [strava_id, name, sport_type, distance_km, duration_seconds, elevation_m, started_at, already_imported]
+
+    StravaActivityListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/StravaActivityPreview'
+        meta:
+          $ref: '#/components/schemas/Meta'
+
+    StravaImportRequest:
+      type: object
+      required: [strava_activity_id]
+      properties:
+        strava_activity_id:
+          type: integer
+          description: The Strava activity ID from GET /strava/activities
+        bike_id:
+          type: string
+          description: Bike to associate. Defaults to the user's first bike if omitted.
+        type:
+          type: string
+          enum: [route, gravel, mtb, urban]
+          default: route
+          description: Activity type to assign in the local database
+        weather:
+          type: string
+          enum: [dry, wet, mixed]
+          description: Weather conditions (optional)
 
     # ── Auth ──────────────────────────────
     RegisterRequest:
