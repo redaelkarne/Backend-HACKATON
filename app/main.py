@@ -9,6 +9,7 @@ from app.routers import (
     progress,
     recommendations,
     challenges,
+    strava,
 )
 
 app = FastAPI(title="Michelin Riding API", version="1.0.0")
@@ -38,6 +39,7 @@ app.include_router(community.router)
 app.include_router(progress.router)
 app.include_router(recommendations.router)
 app.include_router(challenges.router)
+app.include_router(strava.router)
 
 @app.get("/")
 async def root():

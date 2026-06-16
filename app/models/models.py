@@ -18,6 +18,11 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     level = Column(Integer, default=1, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Strava OAuth tokens (nullable — only set after the user connects their Strava account)
+    strava_athlete_id = Column(String(64), nullable=True, unique=True)
+    strava_access_token = Column(Text, nullable=True)
+    strava_refresh_token = Column(Text, nullable=True)
+    strava_token_expires_at = Column(Integer, nullable=True)  # Unix timestamp
 
 
     profile = relationship("Profile", back_populates="user", uselist=False)

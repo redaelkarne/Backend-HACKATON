@@ -1,132 +1,279 @@
 # Michelin Riding API
 
-FastAPI backend for the Michelin Riding app, with a MySQL database. Both services run in Docker.
-
-## Requirements
-
-- [Docker](https://docs.docker.com/get-docker/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
-
-## Getting started
-
-### 1. Clone and configure
-
-Copy the example env file and adjust values if needed:
-
-```bash
-cp .env.example .env
+Base URL: `http://localhost:8000`  
+All endpoints except `/auth/register`, `/auth/login` and `/strava/callback` require:
+```
+Authorization: Bearer <token>
 ```
 
-### 2. Start the services
+---
+
+## Start the app
 
 ```bash
 docker compose up --build
-```
-
-This starts two containers:
-- **api** — FastAPI on `http://localhost:8000`
-- **db** — MySQL 8.0 on port `3306`
-
-The API waits for the database to be healthy before starting.
-
-### 3. Run database migrations
-
-On first run (and after any model change), apply the migrations:
-
-```bash
 docker compose exec api alembic upgrade head
 ```
 
-To generate a new migration after changing a model:
+Swagger UI: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-```bash
-docker compose exec api alembic revision --autogenerate -m "describe your change"
-docker compose exec api alembic upgrade head
+---
+
+## Endpoints
+
+### Auth
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/auth/register` | Create account |
+| POST | `/auth/login` | Login, returns JWT |
+| GET | `/auth/me` | Current user |
+
+### Profile
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/profiles/{userId}` | Get profile + stats |
+| PATCH | `/profiles/{userId}` | Update bio, rider type |
+| POST | `/profiles/{userId}/bike` | Add a bike |
+| POST | `/profiles/{userId}/mounted-tyres` | Mount a tyre on a bike |
+
+### Activities
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/activities` | Create a draft activity |
+| GET | `/activities` | List activities |
+| GET | `/activities/{activityId}` | Get one activity |
+| PATCH | `/activities/{activityId}` | Update notes / weather |
+| POST | `/activities/{activityId}/complete` | Mark as completed with stats |
+| GET | `/activities/{activityId}/route` | Get GPS coordinates for map |
+| POST | `/activities/import/gpx` | Import a GPX file |
+
+### Strava
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/strava/connect` | Get the Strava OAuth URL |
+| GET | `/strava/callback` | OAuth callback (Strava redirects here) |
+| GET | `/strava/activities` | List user's Strava activities |
+| POST | `/strava/import` | Import a Strava activity |
+
+### Community
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/feed` | Community feed |
+| POST | `/activities/{activityId}/like` | Like / unlike |
+| POST | `/activities/{activityId}/comments` | Post a comment |
+
+### Progress
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/progress/summary` | Total km, rides, badges |
+| GET | `/progress/weekly` | Distance per day this week |
+| GET | `/progress/tyre-wear` | Tyre wear per mounted tyre |
+
+### Recommendations
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/recommendations/tyres` | Get tyre recommendation |
+| GET | `/recommendations/tyres/{recommendationId}` | Get saved recommendation |
+
+### Challenges
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/challenges` | List challenges |
+| POST | `/challenges/{challengeId}/join` | Join a challenge |
+
+---
+
+## Connect Strava to an account
+
+### 1. Get the OAuth URL
+
+```
+GET /strava/connect
+Authorization: Bearer <token>
 ```
 
-### 4. Explore the API
-
-Interactive docs (Swagger UI): [http://localhost:8000/docs](http://localhost:8000/docs)
-
-Health check:
-
-```bash
-curl http://localhost:8000/health
+```json
+{
+  "data": {
+    "auth_url": "https://www.strava.com/oauth/authorize?client_id=...",
+    "message": "Open this URL in a browser to connect your Strava account."
+  }
+}
 ```
 
-## Authentication
+Open `auth_url` in the user's browser or a WebView.
 
-All endpoints except `/auth/register` and `/auth/login` require a Bearer token.
+### 2. User authorises on Strava
 
-```bash
-# Register
-curl -X POST http://localhost:8000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"first_name":"Ada","last_name":"Lovelace","email":"ada@example.com","password":"StrongPass1!"}'
+Strava redirects automatically to `GET /strava/callback`. The backend exchanges
+the code and stores the tokens — no action needed on the frontend.
 
-# Login
-curl -X POST http://localhost:8000/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"ada@example.com","password":"StrongPass1!"}'
+Response from the callback:
 
-# Use the returned access_token in subsequent requests
-curl http://localhost:8000/auth/me \
-  -H "Authorization: Bearer <access_token>"
+```json
+{
+  "data": {
+    "connected": true,
+    "athlete_id": "163090788",
+    "athlete_name": "Souhail Cherif"
+  }
+}
 ```
 
-## Running tests
+The account is now linked. Store `connected: true` to show/hide the Strava UI.
 
-Make sure the app is running (`docker compose up`), then:
-
-```bash
-docker compose exec api pip install pytest httpx
-docker compose exec api python -m pytest tests/ -v
-```
-
-## Stopping the app
-
-```bash
-docker compose down
-```
-
-To also delete the database volume:
-
-```bash
-docker compose down -v
-```
-
-## Project structure
+### 3. Browse Strava activities
 
 ```
-.
-├── app/
-│   ├── main.py              # FastAPI entry point
-│   ├── config.py            # Settings from .env
-│   ├── database.py          # Async SQLAlchemy engine and session
-│   ├── core/
-│   │   └── security.py      # JWT creation, password hashing, auth dependency
-│   ├── models/
-│   │   └── models.py        # SQLAlchemy ORM models
-│   ├── schemas/             # Pydantic request/response schemas
-│   └── routers/             # One file per tag (auth, profiles, activities…)
-├── alembic/                 # Database migrations
-├── tests/
-│   ├── conftest.py          # Shared fixtures
-│   └── test_api.py          # Integration tests (41 tests)
-├── Dockerfile
-├── docker-compose.yml
-└── .env
+GET /strava/activities?per_page=20
+Authorization: Bearer <token>
 ```
+
+```json
+{
+  "data": [
+    {
+      "strava_id": 18422693586,
+      "name": "Morning ride",
+      "sport_type": "Ride",
+      "distance_km": 42.3,
+      "duration_seconds": 5640,
+      "elevation_m": 312.0,
+      "started_at": "2026-05-08T08:31:09Z",
+      "already_imported": false
+    }
+  ]
+}
+```
+
+### 4. Import a Strava activity
+
+```
+POST /strava/import
+Authorization: Bearer <token>
+
+{
+  "strava_activity_id": 18422693586,
+  "type": "route",
+  "weather": "dry",
+  "bike_id": "bik_001"
+}
+```
+
+`bike_id` is optional (defaults to first bike).  
+`type`: `route` `gravel` `mtb` `urban`  
+`weather`: `dry` `wet` `mixed`
+
+Returns a standard `Activity` object with an `id` to use for map rendering.
+
+---
+
+## Add a route
+
+A route can be added in three ways. All three store the same GPS coordinates
+and expose them through `GET /activities/{id}/route`.
+
+### Option A — Manual (no GPS)
+
+```
+POST /activities
+{
+  "user_id": "usr_001",
+  "bike_id": "bik_001",
+  "type": "route",
+  "started_at": "2026-06-16T07:00:00Z"
+}
+```
+
+Then complete it with stats:
+
+```
+POST /activities/{activityId}/complete
+{
+  "distance_km": 42.3,
+  "duration_seconds": 5640,
+  "elevation_m": 312,
+  "average_speed_kmh": 26.8
+}
+```
+
+### Option B — GPX file
+
+```
+POST /activities/import/gpx
+Authorization: Bearer <token>
+Content-Type: multipart/form-data
+
+file=<my_ride.gpx>
+type=route
+weather=dry
+```
+
+Stats and GPS coordinates are computed automatically from the file.
+
+### Option C — From Strava
+
+See **Connect Strava** above (steps 3 and 4).
+
+---
+
+## Render the route on a map
+
+```
+GET /activities/{activityId}/route
+Authorization: Bearer <token>
+```
+
+```json
+{
+  "data": {
+    "activity_id": "act_001",
+    "coordinates": [[45.765, 4.841], [45.764, 4.840]],
+    "distance_km": 42.3,
+    "elevation_m": 312.0,
+    "duration_seconds": 5640,
+    "average_speed_kmh": 26.8,
+    "started_at": "2026-06-16T07:00:00",
+    "completed_at": "2026-06-16T08:34:00"
+  }
+}
+```
+
+`coordinates` is an array of `[lat, lon]` pairs.
+
+**Leaflet:**
+```js
+L.polyline(data.coordinates).addTo(map);
+```
+
+**React Native Maps:**
+```js
+const coords = data.coordinates.map(([lat, lng]) => ({ latitude: lat, longitude: lng }));
+<Polyline coordinates={coords} />
+```
+
+**Mapbox GL** (note: Mapbox uses `[lng, lat]`):
+```js
+const coords = data.coordinates.map(([lat, lng]) => [lng, lat]);
+```
+
+---
 
 ## Environment variables
 
-| Variable | Description | Default |
-|---|---|---|
-| `DATABASE_URL` | SQLAlchemy async connection string | `mysql+aiomysql://appuser:apppassword@db:3306/appdb` |
-| `SECRET_KEY` | JWT signing secret | change in production |
-| `ALGORITHM` | JWT algorithm | `HS256` |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | Token lifetime | `1440` (24 h) |
-| `MYSQL_DATABASE` | Database name | `appdb` |
-| `MYSQL_USER` | DB user | `appuser` |
-| `MYSQL_PASSWORD` | DB password | `apppassword` |
-| `MYSQL_ROOT_PASSWORD` | DB root password | `rootpassword` |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `mysql+aiomysql://appuser:apppassword@db:3306/appdb` | DB connection |
+| `SECRET_KEY` | `change-me` | JWT signing secret |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `1440` | Token lifetime (24 h) |
+| `STRAVA_CLIENT_ID` | — | From strava.com/settings/api |
+| `STRAVA_CLIENT_SECRET` | — | From strava.com/settings/api |
+| `STRAVA_REDIRECT_URI` | `http://localhost:8000/strava/callback` | Must match Strava app settings |
+
+---
+
+## Run tests
+
+```bash
+docker compose exec api python -m pytest tests/ -v
+```
