@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.models import Activity, Bike, MountedTyre, Profile, User
 from app.schemas.common import ApiResponse, build_meta
 from app.schemas.profiles import (
-    BikeCreateRequest, BikeOut, MountedTyreCreateRequest, MountedTyreOut,
-    Preferences, ProfileOut, ProfileStats, ProfileUpdateRequest,
+    BikeCreateRequest, BikesListData, BikeOut, BikeWithTyresOut, MountedTyreCreateRequest,
+    MountedTyreOut, Preferences, ProfileOut, ProfileStats, ProfileUpdateRequest,
 )
 
 router = APIRouter(prefix="/profiles", tags=["Profile"])
@@ -76,6 +77,39 @@ async def update_profile(
 
     await db.commit()
     return ApiResponse(data=await _get_profile_out(userId, db), meta=build_meta())
+
+
+@router.get("/{userId}/bikes", response_model=ApiResponse[BikesListData])
+async def list_bikes(userId: str, db: AsyncSession = Depends(get_db), _=Depends(get_current_user)):
+    result = await db.execute(
+        select(Bike).where(Bike.user_id == userId).options(selectinload(Bike.mounted_tyres))
+    )
+    bikes = result.scalars().all()
+
+    items = [
+        BikeWithTyresOut(
+            id=bike.id,
+            user_id=bike.user_id,
+            brand=bike.brand,
+            model=bike.model,
+            category=bike.category,
+            wheel_size=bike.wheel_size,
+            mounted_tyres=[
+                MountedTyreOut(
+                    id=tyre.id,
+                    bike_id=tyre.bike_id,
+                    brand=tyre.brand,
+                    model=tyre.model,
+                    size=tyre.size,
+                    mounted_at=str(tyre.mounted_at),
+                    estimated_lifespan_km=tyre.estimated_lifespan_km,
+                )
+                for tyre in bike.mounted_tyres
+            ],
+        )
+        for bike in bikes
+    ]
+    return ApiResponse(data=BikesListData(items=items), meta=build_meta(total=len(items)))
 
 
 @router.post("/{userId}/bike", response_model=ApiResponse[BikeOut], status_code=201)

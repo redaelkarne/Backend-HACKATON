@@ -50,3 +50,29 @@ class CommentOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CommentWithUser(BaseModel):
+    id: str
+    activity_id: str
+    user_id: str
+    display_name: str
+    avatar_url: Optional[str] = None
+    content: str
+    created_at: datetime
+
+
+class CommentListData(BaseModel):
+    items: List[CommentWithUser]
+
+
+class LeaderboardEntry(BaseModel):
+    rank: int
+    user_id: str
+    display_name: str
+    avatar_url: Optional[str] = None
+    distance_km: float
+
+
+class LeaderboardData(BaseModel):
+    items: List[LeaderboardEntry]

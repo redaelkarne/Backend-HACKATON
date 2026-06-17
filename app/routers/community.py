@@ -1,5 +1,7 @@
+from datetime import datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -8,10 +10,48 @@ from app.database import get_db
 from app.models.models import Activity, Comment, Like, MountedTyre, Profile, User
 from app.schemas.common import ApiResponse, build_meta
 from app.schemas.community import (
-    CommentCreateRequest, CommentOut, FeedData, FeedItem, FeedSummary, FeedUser, LikeData,
+    CommentCreateRequest, CommentListData, CommentOut, CommentWithUser, FeedData, FeedItem,
+    FeedSummary, FeedUser, LeaderboardData, LeaderboardEntry, LikeData,
 )
 
 router = APIRouter(tags=["Community"])
+
+
+@router.get("/leaderboard", response_model=ApiResponse[LeaderboardData])
+async def get_leaderboard(
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    now = datetime.now(timezone.utc)
+    week_start = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    result = await db.execute(
+        select(Activity.user_id, func.sum(Activity.distance_km).label("total_km"))
+        .where(Activity.status == "completed", Activity.completed_at >= week_start)
+        .group_by(Activity.user_id)
+        .order_by(func.sum(Activity.distance_km).desc())
+        .limit(limit)
+    )
+    rows = result.all()
+
+    items = []
+    for rank, (user_id, total_km) in enumerate(rows, start=1):
+        user_result = await db.execute(select(User).where(User.id == user_id))
+        user = user_result.scalar_one_or_none()
+        if not user:
+            continue
+        profile_result = await db.execute(select(Profile).where(Profile.user_id == user_id))
+        profile = profile_result.scalar_one_or_none()
+        items.append(LeaderboardEntry(
+            rank=rank,
+            user_id=user_id,
+            display_name=f"{user.first_name} {user.last_name[0]}.",
+            avatar_url=profile.avatar_url if profile else None,
+            distance_km=round(float(total_km or 0), 1),
+        ))
+
+    return ApiResponse(data=LeaderboardData(items=items), meta=build_meta(total=len(items)))
 
 
 @router.get("/feed", response_model=ApiResponse[FeedData])
@@ -120,3 +160,34 @@ async def add_comment(
     await db.commit()
     await db.refresh(comment)
     return ApiResponse(data=CommentOut.model_validate(comment), meta=build_meta())
+
+
+@router.get("/activities/{activityId}/comments", response_model=ApiResponse[CommentListData])
+async def list_comments(
+    activityId: str,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Comment)
+        .where(Comment.activity_id == activityId)
+        .options(selectinload(Comment.user))
+        .order_by(Comment.created_at.asc())
+    )
+    comments = result.scalars().all()
+
+    items = []
+    for comment in comments:
+        profile_result = await db.execute(select(Profile).where(Profile.user_id == comment.user_id))
+        profile = profile_result.scalar_one_or_none()
+        items.append(CommentWithUser(
+            id=comment.id,
+            activity_id=comment.activity_id,
+            user_id=comment.user_id,
+            display_name=f"{comment.user.first_name} {comment.user.last_name[0]}.",
+            avatar_url=profile.avatar_url if profile else None,
+            content=comment.content,
+            created_at=comment.created_at,
+        ))
+
+    return ApiResponse(data=CommentListData(items=items), meta=build_meta(total=len(items)))

@@ -68,3 +68,19 @@ class MountedTyreOut(BaseModel):
     estimated_lifespan_km: float
 
     model_config = {"from_attributes": True}
+
+
+class BikeWithTyresOut(BaseModel):
+    id: str
+    user_id: str
+    brand: str
+    model: str
+    category: str
+    wheel_size: Optional[str] = None
+    mounted_tyres: List[MountedTyreOut] = []
+
+    model_config = {"from_attributes": True}
+
+
+class BikesListData(BaseModel):
+    items: List[BikeWithTyresOut]
