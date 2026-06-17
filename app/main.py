@@ -12,6 +12,7 @@ from app.routers import (
     challenges,
     strava,
     events,
+    catalogue,
 )
 
 app = FastAPI(title="Michelin Riding API", version="1.0.0")
@@ -45,6 +46,7 @@ app.include_router(recommendations.router)
 app.include_router(challenges.router)
 app.include_router(strava.router)
 app.include_router(events.router)
+app.include_router(catalogue.router)
 
 
 @app.get("/")
