@@ -946,7 +946,9 @@
     "Shoulder Color": "BLACK",
     "Border Color": "BLACK",
     "Label type": "BLUE & YELLOW ",
-    "CYCLE TYPE WEB": "ROAD"
+    "CYCLE TYPE WEB": "ROAD",
+    "PIC":"https://dxm.contentcenter.michelin.com/api/wedia/dam/transform/b98rpyxf61b4qhq558e685kyzr/bi-126_3528700163926_tire_michelin_power-cup_700-x-25c_a_main_1-30_nopad.webp?t=resize&height=500"
+
   },
   {
     "Global ID": "BI-175",

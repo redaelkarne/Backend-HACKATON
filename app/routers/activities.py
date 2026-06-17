@@ -206,7 +206,11 @@ async def import_gpx(
     moving_data = gpx.get_moving_data()
     uphill_gain = gpx.get_uphill_downhill().uphill if gpx.has_elevations() else None
 
-    distance_km = round((moving_data.moving_distance or 0) / 1000, 2)
+    # get_moving_data() needs timestamps; fall back to length_2d() for timestamp-less routes
+    raw_distance = moving_data.moving_distance or 0
+    if raw_distance == 0:
+        raw_distance = gpx.length_2d() or 0
+    distance_km = round(raw_distance / 1000, 2)
     duration_seconds = int(moving_data.moving_time or 0)
     elevation_m = round(uphill_gain, 1) if uphill_gain is not None else None
     average_speed_kmh = round(distance_km / (duration_seconds / 3600), 2) if duration_seconds > 0 else 0
