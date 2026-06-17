@@ -14,6 +14,7 @@ from typing import List, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -157,13 +158,9 @@ async def strava_callback(
     db.add(user)
     await db.commit()
 
-    return ApiResponse(
-        data=StravaConnectedOut(
-            connected=True,
-            athlete_id=user.strava_athlete_id,
-            athlete_name=f"{athlete.get('firstname', '')} {athlete.get('lastname', '')}".strip(),
-        ),
-        meta=build_meta(),
+    return RedirectResponse(
+        url=f"{settings.strava_frontend_url}?strava_connected=1",
+        status_code=302,
     )
 
 
