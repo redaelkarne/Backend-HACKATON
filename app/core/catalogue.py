@@ -181,6 +181,35 @@ def _build_reasons(
     return reasons[:5]
 
 
+def lookup_tyre_pics(model_name: str) -> dict:
+    """Return pic1/pic2 for a tyre model.
+
+    Matching strategy (in order):
+    1. Exact match against Web Range Name (case-insensitive)
+    2. User input is a substring of Web Range Name
+    3. Web Range Name is a substring of user input
+    Returns first match found that has at least one image.
+    """
+    name_lower = (model_name or "").strip().lower()
+    if not name_lower:
+        return {"pic1": None, "pic2": None}
+
+    best = None
+    for t in _load():
+        wrn = (t.get("Web Range Name") or "").strip().lower()
+        if not wrn:
+            continue
+        pics = {"pic1": t.get("PIC1") or None, "pic2": t.get("PIC2") or None}
+        # Exact match — return immediately
+        if wrn == name_lower:
+            return pics
+        # Substring match — keep first hit for fallback
+        if best is None and (name_lower in wrn or wrn in name_lower):
+            best = pics
+
+    return best or {"pic1": None, "pic2": None}
+
+
 def find_best_tyres(
     bike_type: str,
     riding_style: str,

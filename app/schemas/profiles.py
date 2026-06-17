@@ -66,6 +66,8 @@ class MountedTyreOut(BaseModel):
     size: str
     mounted_at: str
     estimated_lifespan_km: float
+    pic1: Optional[str] = None
+    pic2: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

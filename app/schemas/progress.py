@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -27,6 +27,8 @@ class TyreWearItem(BaseModel):
     estimated_lifespan_km: float
     wear_percent: float
     replacement_status: str
+    pic1: Optional[str] = None
+    pic2: Optional[str] = None
 
 
 class TyreWearData(BaseModel):

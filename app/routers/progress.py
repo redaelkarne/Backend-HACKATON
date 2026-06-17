@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.catalogue import lookup_tyre_pics
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.models import Activity, Bike, MountedTyre, User
@@ -106,6 +107,7 @@ async def tyre_wear(db: AsyncSession = Depends(get_db), current_user: User = Dep
                 estimated_lifespan_km=tyre.estimated_lifespan_km,
                 wear_percent=pct,
                 replacement_status=status,
+                **lookup_tyre_pics(tyre.model),
             ))
 
     return ApiResponse(data=TyreWearData(items=items), meta=build_meta())

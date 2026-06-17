@@ -3,6 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.catalogue import lookup_tyre_pics
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.models import Activity, Bike, MountedTyre, Profile, User
@@ -103,6 +104,7 @@ async def list_bikes(userId: str, db: AsyncSession = Depends(get_db), _=Depends(
                     size=tyre.size,
                     mounted_at=str(tyre.mounted_at),
                     estimated_lifespan_km=tyre.estimated_lifespan_km,
+                    **lookup_tyre_pics(tyre.model),
                 )
                 for tyre in bike.mounted_tyres
             ],
@@ -145,5 +147,6 @@ async def add_mounted_tyre(
         size=tyre.size,
         mounted_at=str(tyre.mounted_at),
         estimated_lifespan_km=tyre.estimated_lifespan_km,
+        **lookup_tyre_pics(tyre.model),
     )
     return ApiResponse(data=data, meta=build_meta())
