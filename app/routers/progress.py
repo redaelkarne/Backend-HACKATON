@@ -85,18 +85,34 @@ async def tyre_wear(db: AsyncSession = Depends(get_db), current_user: User = Dep
 
     items = []
     for bike in bikes:
-        tyres_result = await db.execute(select(MountedTyre).where(MountedTyre.bike_id == bike.id))
-        for tyre in tyres_result.scalars().all():
+        tyres_result = await db.execute(
+            select(MountedTyre).where(MountedTyre.bike_id == bike.id)
+        )
+        tyres = sorted(tyres_result.scalars().all(), key=lambda t: t.mounted_at)
+
+        for i, tyre in enumerate(tyres):
+            mounted_from = datetime(
+                tyre.mounted_at.year, tyre.mounted_at.month, tyre.mounted_at.day,
+                tzinfo=timezone.utc,
+            )
+            # Bound the end date to when the next tyre was mounted (if any)
+            next_tyre = tyres[i + 1] if i + 1 < len(tyres) else None
+            mounted_until = datetime(
+                next_tyre.mounted_at.year, next_tyre.mounted_at.month, next_tyre.mounted_at.day,
+                tzinfo=timezone.utc,
+            ) if next_tyre else None
+
+            conditions = [
+                Activity.user_id == current_user.id,
+                Activity.bike_id == bike.id,
+                Activity.status == "completed",
+                Activity.started_at >= mounted_from,
+            ]
+            if mounted_until:
+                conditions.append(Activity.started_at < mounted_until)
+
             dist_result = await db.execute(
-                select(func.coalesce(func.sum(Activity.distance_km), 0)).where(
-                    Activity.user_id == current_user.id,
-                    Activity.bike_id == bike.id,
-                    Activity.status == "completed",
-                    Activity.started_at >= datetime(
-                        tyre.mounted_at.year, tyre.mounted_at.month, tyre.mounted_at.day,
-                        tzinfo=timezone.utc
-                    ),
-                )
+                select(func.coalesce(func.sum(Activity.distance_km), 0)).where(*conditions)
             )
             done = float(dist_result.scalar())
             pct = round((done / tyre.estimated_lifespan_km) * 100, 1) if tyre.estimated_lifespan_km else 0.0
