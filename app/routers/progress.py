@@ -89,6 +89,7 @@ async def tyre_wear(db: AsyncSession = Depends(get_db), current_user: User = Dep
         for tyre in tyres_result.scalars().all():
             dist_result = await db.execute(
                 select(func.coalesce(func.sum(Activity.distance_km), 0)).where(
+                    Activity.user_id == current_user.id,
                     Activity.bike_id == bike.id,
                     Activity.status == "completed",
                     Activity.started_at >= datetime(
