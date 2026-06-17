@@ -138,6 +138,8 @@ class TyreCandidate(BaseModel):
     sealing: Optional[str] = None
     reasons: Optional[List[str]] = None
     product_url: Optional[str] = None
+    pic1: Optional[str] = None
+    pic2: Optional[str] = None
 
 
 class TyreRecommendationPayload(BaseModel):

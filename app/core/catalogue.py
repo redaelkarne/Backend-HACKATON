@@ -235,6 +235,8 @@ def find_best_tyres(
             "sealing": t.get("Sealing") or "",
             "reasons": _build_reasons(t, bike_type, riding_style, terrain, tubeless, e_bike),
             "product_url": f"{MICHELIN_BASE_URL}/{slug}",
+            "pic1": t.get("PIC1") or None,
+            "pic2": t.get("PIC2") or None,
         })
 
     return results
