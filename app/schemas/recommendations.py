@@ -129,6 +129,7 @@ class TyreRecommendationRequest(BaseModel):
 
 
 class TyreCandidate(BaseModel):
+    id: Optional[int] = None
     brand: str
     model: str
     category: str

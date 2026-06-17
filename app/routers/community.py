@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.catalogue import lookup_tyre_db
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.models import Activity, Comment, Like, MountedTyre, Profile, User
@@ -80,7 +81,10 @@ async def get_feed(
         )
         tyres = tyres_result.scalars().all()
         verified = any(t.brand.lower() == "michelin" for t in tyres)
-        tyre_name = next((f"{t.brand} {t.model}" for t in tyres if t.brand.lower() == "michelin"), None)
+        michelin_tyre = next((t for t in tyres if t.brand.lower() == "michelin"), None)
+        tyre_name = f"{michelin_tyre.brand} {michelin_tyre.model}" if michelin_tyre else None
+
+        tyre_info = await lookup_tyre_db(michelin_tyre.model, db) if michelin_tyre else {}
 
         profile_result = await db.execute(select(Profile).where(Profile.user_id == act.user_id))
         profile = profile_result.scalar_one_or_none()
@@ -99,6 +103,7 @@ async def get_feed(
                 elevation_m=act.elevation_m,
                 duration_seconds=act.duration_seconds,
                 tyre_name=tyre_name,
+                tyre_catalogue_id=tyre_info.get("catalogue_id"),
             ),
             verified_michelin_review=verified,
             likes_count=len(act.likes),

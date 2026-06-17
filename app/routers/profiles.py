@@ -3,7 +3,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.catalogue import lookup_tyre_pics
+from app.core.catalogue import lookup_tyre_db
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.models import Activity, Bike, MountedTyre, Profile, User
@@ -87,30 +87,30 @@ async def list_bikes(userId: str, db: AsyncSession = Depends(get_db), _=Depends(
     )
     bikes = result.scalars().all()
 
-    items = [
-        BikeWithTyresOut(
+    items = []
+    for bike in bikes:
+        tyres_out = []
+        for tyre in bike.mounted_tyres:
+            tyre_info = await lookup_tyre_db(tyre.model, db)
+            tyres_out.append(MountedTyreOut(
+                id=tyre.id,
+                bike_id=tyre.bike_id,
+                brand=tyre.brand,
+                model=tyre.model,
+                size=tyre.size,
+                mounted_at=str(tyre.mounted_at),
+                estimated_lifespan_km=tyre.estimated_lifespan_km,
+                **tyre_info,
+            ))
+        items.append(BikeWithTyresOut(
             id=bike.id,
             user_id=bike.user_id,
             brand=bike.brand,
             model=bike.model,
             category=bike.category,
             wheel_size=bike.wheel_size,
-            mounted_tyres=[
-                MountedTyreOut(
-                    id=tyre.id,
-                    bike_id=tyre.bike_id,
-                    brand=tyre.brand,
-                    model=tyre.model,
-                    size=tyre.size,
-                    mounted_at=str(tyre.mounted_at),
-                    estimated_lifespan_km=tyre.estimated_lifespan_km,
-                    **lookup_tyre_pics(tyre.model),
-                )
-                for tyre in bike.mounted_tyres
-            ],
-        )
-        for bike in bikes
-    ]
+            mounted_tyres=tyres_out,
+        ))
     return ApiResponse(data=BikesListData(items=items), meta=build_meta(total=len(items)))
 
 

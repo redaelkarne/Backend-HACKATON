@@ -15,6 +15,7 @@ class FeedSummary(BaseModel):
     elevation_m: Optional[float] = None
     duration_seconds: Optional[int] = None
     tyre_name: Optional[str] = None
+    tyre_catalogue_id: Optional[int] = None
 
 
 class FeedItem(BaseModel):

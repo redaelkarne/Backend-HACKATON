@@ -86,6 +86,7 @@ class Activity(Base):
     elevation_m = Column(Float)
     average_speed_kmh = Column(Float)
     route_polyline = Column(Text)
+    rating = Column(Integer)
     started_at = Column(DateTime(timezone=True), nullable=False)
     completed_at = Column(DateTime(timezone=True))
 

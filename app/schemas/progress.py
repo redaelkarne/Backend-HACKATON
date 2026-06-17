@@ -27,6 +27,7 @@ class TyreWearItem(BaseModel):
     estimated_lifespan_km: float
     wear_percent: float
     replacement_status: str
+    catalogue_id: Optional[int] = None
     pic1: Optional[str] = None
     pic2: Optional[str] = None
 

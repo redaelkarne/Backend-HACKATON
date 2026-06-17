@@ -16,6 +16,7 @@ class ActivityCreateRequest(BaseModel):
 class ActivityUpdateRequest(BaseModel):
     weather: Optional[str] = None
     notes: Optional[str] = None
+    rating: Optional[int] = None
 
 
 class ActivityCompleteRequest(BaseModel):
@@ -39,6 +40,7 @@ class ActivityOut(BaseModel):
     elevation_m: Optional[float] = None
     average_speed_kmh: Optional[float] = None
     route_polyline: Optional[str] = None
+    rating: Optional[int] = None
     started_at: datetime
     completed_at: Optional[datetime] = None
 

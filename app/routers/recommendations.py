@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.catalogue import find_best_tyres
+from app.core.catalogue import find_best_tyres, lookup_tyre_db
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.models import TyreRecommendation, User
@@ -30,7 +30,9 @@ async def create_recommendation(
     if not results:
         raise HTTPException(status_code=404, detail="No tyre found for these criteria")
 
-    primary = TyreCandidate(**results[0])
+    primary_data = dict(results[0])
+    catalogue_info = await lookup_tyre_db(primary_data.get("model", ""), db)
+    primary = TyreCandidate(**{**primary_data, "id": catalogue_info["catalogue_id"]})
     alternatives = [TyreCandidate(**t) for t in results[1:]]
 
     rec = TyreRecommendation(
@@ -68,10 +70,14 @@ async def get_recommendation(
     if not rec:
         raise HTTPException(status_code=404, detail="Recommendation not found")
 
+    primary_stored = dict(rec.primary_tyre or {})
+    catalogue_info = await lookup_tyre_db(primary_stored.get("model", ""), db)
+    primary_tyre = TyreCandidate(**{**primary_stored, "id": catalogue_info["catalogue_id"]})
+
     return ApiResponse(
         data=TyreRecommendationPayload(
             recommendation_id=rec.id,
-            primary_tyre=TyreCandidate(**rec.primary_tyre),
+            primary_tyre=primary_tyre,
             alternatives=[TyreCandidate(**a) for a in (rec.alternatives or [])],
         ),
         meta=build_meta(),

@@ -181,6 +181,31 @@ def _build_reasons(
     return reasons[:5]
 
 
+async def lookup_tyre_db(model_name: str, db) -> dict:
+    """Search the tyres DB table by web_range_name and return id + pics."""
+    from sqlalchemy import func, select
+    from app.models.models import Tyre
+
+    name_lower = (model_name or "").strip().lower()
+    if not name_lower:
+        return {"catalogue_id": None, "pic1": None, "pic2": None}
+
+    result = await db.execute(
+        select(Tyre).where(func.lower(Tyre.web_range_name) == name_lower)
+    )
+    tyre = result.scalar_one_or_none()
+
+    if not tyre:
+        result = await db.execute(
+            select(Tyre).where(Tyre.web_range_name.ilike(f"%{name_lower}%"))
+        )
+        tyre = result.scalars().first()
+
+    if tyre:
+        return {"catalogue_id": tyre.id, "pic1": tyre.pic1, "pic2": tyre.pic2}
+    return {"catalogue_id": None, "pic1": None, "pic2": None}
+
+
 def lookup_tyre_pics(model_name: str) -> dict:
     """Return pic1/pic2 for a tyre model.
 

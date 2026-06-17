@@ -66,6 +66,7 @@ class MountedTyreOut(BaseModel):
     size: str
     mounted_at: str
     estimated_lifespan_km: float
+    catalogue_id: Optional[int] = None
     pic1: Optional[str] = None
     pic2: Optional[str] = None
 

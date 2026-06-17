@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.catalogue import lookup_tyre_pics
+from app.core.catalogue import lookup_tyre_db
 from app.core.security import get_current_user
 from app.database import get_db
 from app.models.models import Activity, Bike, MountedTyre, User
@@ -100,6 +100,7 @@ async def tyre_wear(db: AsyncSession = Depends(get_db), current_user: User = Dep
             done = float(dist_result.scalar())
             pct = round((done / tyre.estimated_lifespan_km) * 100, 1) if tyre.estimated_lifespan_km else 0.0
             status = "ok" if pct < 70 else ("monitor" if pct < 90 else "replace_soon")
+            tyre_info = await lookup_tyre_db(tyre.model, db)
             items.append(TyreWearItem(
                 mounted_tyre_id=tyre.id,
                 tyre_name=f"{tyre.brand} {tyre.model}",
@@ -107,7 +108,7 @@ async def tyre_wear(db: AsyncSession = Depends(get_db), current_user: User = Dep
                 estimated_lifespan_km=tyre.estimated_lifespan_km,
                 wear_percent=pct,
                 replacement_status=status,
-                **lookup_tyre_pics(tyre.model),
+                **tyre_info,
             ))
 
     return ApiResponse(data=TyreWearData(items=items), meta=build_meta())
