@@ -11,6 +11,11 @@ from app.schemas.recommendations import TyreCandidate, TyreRecommendationPayload
 
 router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
 
+_RIDER_TYPE_MAP = {"route": "road", "gravel": "gravel", "mtb": "mtb", "urban": "city"}
+_TERRAIN_MAP = {"road": "asphalt", "mixed": "mixed", "trail": "offroad_mixed", "city": "asphalt"}
+_RIDING_STYLE_MAP = {"route": "endurance", "gravel": "all_road", "mtb": "trail", "urban": "urban"}
+_PRIORITY_MAP = {"performance": "performance", "grip": "competition", "durability": "access"}
+
 
 @router.post("/tyres", response_model=ApiResponse[TyreRecommendationPayload], status_code=201)
 async def create_recommendation(
@@ -19,12 +24,11 @@ async def create_recommendation(
     current_user: User = Depends(get_current_user),
 ):
     results = find_best_tyres(
-        bike_type=body.bike_type,
-        riding_style=body.riding_style,
-        terrain=body.terrain,
-        budget_level=body.budget_level,
-        tubeless=body.tubeless,
-        e_bike=body.e_bike,
+        bike_type=_RIDER_TYPE_MAP[body.rider_type],
+        riding_style=_RIDING_STYLE_MAP[body.rider_type],
+        terrain=_TERRAIN_MAP[body.terrain],
+        budget_level=_PRIORITY_MAP[body.priority],
+        tubeless=False,
     )
 
     if not results:
@@ -37,11 +41,11 @@ async def create_recommendation(
 
     rec = TyreRecommendation(
         user_id=current_user.id,
-        rider_type=body.bike_type,
+        rider_type=body.rider_type,
         terrain=body.terrain,
-        weather=body.riding_style,
-        priority=body.budget_level,
-        ride_frequency="tubeless" if body.tubeless else "tube",
+        weather=body.weather,
+        priority=body.priority,
+        ride_frequency=body.ride_frequency,
         primary_tyre=primary.model_dump(),
         alternatives=[a.model_dump() for a in alternatives],
     )
