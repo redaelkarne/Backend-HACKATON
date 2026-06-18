@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -15,7 +17,15 @@ from app.routers import (
     catalogue,
 )
 
-app = FastAPI(title="Michelin Riding API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from seed_tyres import seed
+    await seed()
+    yield
+
+
+app = FastAPI(title="Michelin Riding API", version="1.0.0", lifespan=lifespan)
 
 origins = [
     "http://localhost:5173",
