@@ -14,7 +14,7 @@ router = APIRouter(prefix="/recommendations", tags=["Recommendations"])
 _RIDER_TYPE_MAP = {"route": "road", "gravel": "gravel", "mtb": "mtb", "urban": "city"}
 _TERRAIN_MAP = {"road": "asphalt", "mixed": "mixed", "trail": "offroad_mixed", "city": "asphalt"}
 _RIDING_STYLE_MAP = {"route": "endurance", "gravel": "all_road", "mtb": "trail", "urban": "urban"}
-_PRIORITY_MAP = {"performance": "performance", "grip": "competition", "durability": "access"}
+_PRIORITY_MAP = {"performance": "performance", "grip": "competition", "durability": "access", "racing": "racing"}
 
 
 @router.post("/tyres", response_model=ApiResponse[TyreRecommendationPayload], status_code=201)
@@ -23,12 +23,13 @@ async def create_recommendation(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    tubeless = body.tubeless if body.tubeless is not None else True
     results = find_best_tyres(
         bike_type=_RIDER_TYPE_MAP[body.rider_type],
         riding_style=_RIDING_STYLE_MAP[body.rider_type],
         terrain=_TERRAIN_MAP[body.terrain],
         budget_level=_PRIORITY_MAP[body.priority],
-        tubeless=False,
+        tubeless=tubeless,
     )
 
     if not results:
