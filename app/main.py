@@ -37,6 +37,7 @@ origins = [
     "http://localhost:19006",
     "http://127.0.0.1:19006",
     "https://cycling-web-production.up.railway.app",
+    "https://cycling-web-production.up.railway.app:8080",
 ]
 
 app.add_middleware(
