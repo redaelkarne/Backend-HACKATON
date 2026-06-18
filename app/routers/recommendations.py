@@ -15,6 +15,8 @@ _RIDER_TYPE_MAP = {"route": "road", "gravel": "gravel", "mtb": "mtb", "urban": "
 _TERRAIN_MAP = {"road": "asphalt", "mixed": "mixed", "trail": "offroad_mixed", "city": "asphalt"}
 _RIDING_STYLE_MAP = {"route": "endurance", "gravel": "all_road", "mtb": "trail", "urban": "urban"}
 _PRIORITY_MAP = {"performance": "performance", "grip": "competition", "durability": "access", "racing": "racing"}
+# When the user explicitly picks "racing" priority, override the riding style to match racing-use tyres
+_PRIORITY_STYLE_OVERRIDE = {"racing": "racing", "grip": "racing"}
 
 
 @router.post("/tyres", response_model=ApiResponse[TyreRecommendationPayload], status_code=201)
@@ -24,9 +26,10 @@ async def create_recommendation(
     current_user: User = Depends(get_current_user),
 ):
     tubeless = body.tubeless if body.tubeless is not None else True
+    riding_style = _PRIORITY_STYLE_OVERRIDE.get(body.priority, _RIDING_STYLE_MAP[body.rider_type])
     results = find_best_tyres(
         bike_type=_RIDER_TYPE_MAP[body.rider_type],
-        riding_style=_RIDING_STYLE_MAP[body.rider_type],
+        riding_style=riding_style,
         terrain=_TERRAIN_MAP[body.terrain],
         budget_level=_PRIORITY_MAP[body.priority],
         tubeless=tubeless,
