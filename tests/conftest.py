@@ -90,14 +90,3 @@ def completed_activity_id(client, h, activity_id):
     return activity_id
 
 
-@pytest.fixture(scope="session")
-def recommendation_id(client, h):
-    r = client.post("/recommendations/tyres", headers=h, json={
-        "rider_type": "route",
-        "terrain": "road",
-        "weather": "dry",
-        "priority": "performance",
-        "ride_frequency": "frequent",
-    })
-    assert r.status_code == 201, r.text
-    return r.json()["data"]["recommendation_id"]

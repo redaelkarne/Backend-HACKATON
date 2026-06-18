@@ -52,10 +52,14 @@ jobs:
 
       - name: Start API server
         run: |
-          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn.log 2>&1 &
           for i in $(seq 1 30); do
             curl -sf http://localhost:8000/health && break || sleep 2
           done
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
+
+      - name: Show server logs on failure
+        if: failure()
+        run: cat /tmp/uvicorn.log

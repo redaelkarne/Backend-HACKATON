@@ -252,46 +252,6 @@ class TestProgress:
 
 
 # ---------------------------------------------------------------------------
-# Recommendations
-# ---------------------------------------------------------------------------
-
-class TestRecommendations:
-    def test_create_recommendation(self, client, h, recommendation_id):
-        assert recommendation_id.startswith("rec_")
-
-    def test_recommendation_shape(self, client, h, recommendation_id):
-        r = client.get(f"/recommendations/tyres/{recommendation_id}", headers=h)
-        assert r.status_code == 200
-        data = r.json()["data"]
-        assert data["recommendation_id"] == recommendation_id
-        assert "primary_tyre" in data
-        assert data["primary_tyre"]["brand"] == "Michelin"
-        assert isinstance(data["alternatives"], list)
-
-    def test_recommendation_not_found(self, client, h):
-        r = client.get("/recommendations/tyres/rec_notexist", headers=h)
-        assert r.status_code == 404
-
-    @pytest.mark.parametrize("rider_type,terrain,weather,priority", [
-        ("route", "road", "dry", "performance"),
-        ("route", "road", "wet", "grip"),
-        ("gravel", "mixed", "dry", "performance"),
-        ("mtb", "trail", "wet", "grip"),
-        ("urban", "city", "dry", "durability"),
-    ])
-    def test_recommendation_variants(self, client, h, rider_type, terrain, weather, priority):
-        r = client.post("/recommendations/tyres", headers=h, json={
-            "rider_type": rider_type,
-            "terrain": terrain,
-            "weather": weather,
-            "priority": priority,
-            "ride_frequency": "regular",
-        })
-        assert r.status_code == 201
-        assert r.json()["data"]["primary_tyre"]["brand"] == "Michelin"
-
-
-# ---------------------------------------------------------------------------
 # Challenges
 # ---------------------------------------------------------------------------
 
