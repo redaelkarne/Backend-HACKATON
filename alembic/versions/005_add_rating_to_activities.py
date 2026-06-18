@@ -16,7 +16,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE activities ADD COLUMN IF NOT EXISTS rating INTEGER")
+    bind = op.get_bind()
+    cols = [row[0] for row in bind.execute(sa.text("SHOW COLUMNS FROM activities")).fetchall()]
+    if "rating" not in cols:
+        op.add_column("activities", sa.Column("rating", sa.Integer(), nullable=True))
 
 
 def downgrade() -> None:
